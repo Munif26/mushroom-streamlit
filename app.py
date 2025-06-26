@@ -1,26 +1,35 @@
 
 import streamlit as st
+import pandas as pd
 import joblib
 
+# Load model dan label encoder
 model = joblib.load('mushroom_rf_model.pkl')
+encoders = joblib.load('label_encoders.pkl')
 
-st.title("🍄 Prediksi Jamur: Beracun atau Tidak?")
+features = list(encoders.keys())
+features.remove('class')
 
-odor = st.selectbox("Bau Jamur", ['almond', 'creosote', 'foul', 'none', 'pungent', 'spicy', 'fishy', 'musty'])
-gill_color = st.selectbox("Warna Insang", ['black', 'brown', 'buff', 'chocolate', 'gray', 'orange', 'pink', 'purple', 'red', 'white', 'yellow'])
-spore_print_color = st.selectbox("Warna Cetakan Spora", ['black', 'brown', 'buff', 'chocolate', 'green', 'orange', 'purple', 'white', 'yellow'])
+st.title("🍄 Prediksi Jamur: Apakah Beracun atau Dapat Dimakan?")
+st.markdown("Masukkan ciri-ciri jamur di bawah ini untuk memprediksi klasifikasinya:")
 
-encoder_maps = {
-    'odor': {'almond': 0, 'creosote': 1, 'foul': 2, 'none': 3, 'pungent': 4, 'spicy': 5, 'fishy': 6, 'musty': 7},
-    'gill-color': {'black': 0, 'brown': 1, 'buff': 2, 'chocolate': 3, 'gray': 4, 'orange': 5, 'pink': 6, 'purple': 7, 'red': 8, 'white': 9, 'yellow': 10},
-    'spore-print-color': {'black': 0, 'brown': 1, 'buff': 2, 'chocolate': 3, 'green': 4, 'orange': 5, 'purple': 6, 'white': 7, 'yellow': 8}
-}
+user_input = {}
+for feature in features:
+    categories = encoders[feature].classes_
+    user_input[feature] = st.selectbox(feature, categories)
 
+# Buat dataframe
+input_df = pd.DataFrame([user_input])
+
+# Encode input sesuai label encoder
+for col in input_df.columns:
+    input_df[col] = encoders[col].transform(input_df[col])
+
+# Prediksi
 if st.button("Prediksi"):
-    input_data = [
-        encoder_maps['odor'][odor],
-        encoder_maps['gill-color'][gill_color],
-        encoder_maps['spore-print-color'][spore_print_color]
-    ]
-    result = model.predict([input_data])[0]
-    st.success("☠️ Beracun" if result == 1 else "🍽️ Dapat Dimakan")
+    pred = model.predict(input_df)[0]
+    label = encoders['class'].inverse_transform([pred])[0]
+    if label == 'e':
+        st.success("🍽️ Jamur ini **AMAN dimakan (edible)**.")
+    else:
+        st.error("☠️ Jamur ini **BERACUN (poisonous)**!")
